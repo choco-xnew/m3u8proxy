@@ -4,8 +4,8 @@ import colors from "colors";
 
 dotenv.config();
 
-const host = process.env.HOST || "127.0.0.1";
-const port = process.env.PORT || 8080;
+const host = process.env.HOST || "0.0.0.0";
+const port = process.env.PORT || 5000;
 const web_server_url = process.env.PUBLIC_URL || `http://${host}:${port}`;
 
 export default function server() {
@@ -28,7 +28,7 @@ export default function server() {
     httpProxyOptions: {
       xfwd: false,
     },
-  }).listen(port, Number(host), function () {
+  }).listen(port, host, function () {
     console.log(
       colors.green("Server running on ") + colors.blue(`${web_server_url}`)
     );
