@@ -3,9 +3,9 @@ import httpProxy from "http-proxy";
 import http from "node:http";
 import https from "node:https";
 import fs from "node:fs";
-import path from "node:path";
+import path, { join } from "node:path";
 import os from "node:os";
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from "url";
 
 // Helper for file paths
 const __filename = fileURLToPath(import.meta.url);
@@ -45,8 +45,14 @@ export default function createServer(options) {
   // CORS Helper
   const handleCors = (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, OPTIONS"
+    );
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization"
+    );
     res.setHeader("Access-Control-Allow-Credentials", "true");
 
     if (req.method === "OPTIONS") {
@@ -60,8 +66,16 @@ export default function createServer(options) {
   // Security Check Helper
   const isOriginAllowed = (origin, options) => {
     if (options.originWhitelist.includes("*")) return true;
-    if (options.originWhitelist.length && !options.originWhitelist.includes(origin)) return false;
-    if (options.originBlacklist.length && options.originBlacklist.includes(origin)) return false;
+    if (
+      options.originWhitelist.length &&
+      !options.originWhitelist.includes(origin)
+    )
+      return false;
+    if (
+      options.originBlacklist.length &&
+      options.originBlacklist.includes(origin)
+    )
+      return false;
     return true;
   };
 
@@ -71,15 +85,14 @@ export default function createServer(options) {
 
     // 1. PUBLIC ROUTES (Bypass Origin Check)
     // --------------------------------------
-    
+
     // Route: /proxy (The Dashboard)
-    if (req.url === '/proxy' || req.url === '/proxy/') {
+    if (req.url === "/proxy" || req.url === "/proxy/") {
       try {
-        const dashboardPath = path.join(__dirname, 'proxy.html');
-        const dashboardContent = fs.readFileSync(dashboardPath, 'utf8');
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(dashboardContent);
-        return;
+        res.writeHead(200, { "Content-Type": "text/html" });
+        return res.end(
+          fs.readFileSync(join(__dirname, "../proxy.html"))
+        );
       } catch (err) {
         res.writeHead(500);
         res.end("Dashboard file missing.");
@@ -88,26 +101,28 @@ export default function createServer(options) {
     }
 
     // Route: /api/stats (For the Dashboard Terminal)
-    if (req.url === '/api/stats') {
-        const stats = {
-            requests: serverStats.totalRequests,
-            uptime: getUptime(),
-            memory: Math.round(process.memoryUsage().rss / 1024 / 1024) + " MB",
-            host: os.hostname()
-        };
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(stats));
-        return;
+    if (req.url === "/api/stats") {
+      const stats = {
+        requests: serverStats.totalRequests,
+        uptime: getUptime(),
+        memory:
+          Math.round(process.memoryUsage().rss / 1024 / 1024) + " MB",
+        host: os.hostname(),
+      };
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(stats));
+      return;
     }
-
 
     // 2. SECURITY & PROXY LOGIC
     // --------------------------------------
-    
+
     // If not a public page, enforce Origin Security
     if (!isOriginAllowed(origin, options)) {
       res.writeHead(403, "Forbidden");
-      res.end(`The origin "${origin}" was blacklisted by the operator of this proxy.`);
+      res.end(
+        `The origin "${origin}" was blacklisted by the operator of this proxy.`
+      );
       return;
     }
 
@@ -120,7 +135,6 @@ export default function createServer(options) {
     // Forward to actual Proxy Handler
     requestHandler(req, res);
   };
-
 
   // Server Creation
   if (options.httpsOptions) {
@@ -139,8 +153,9 @@ export default function createServer(options) {
       return;
     }
 
-    // Remove old headers
-    const headerNames = res.getHeaderNames ? res.getHeaderNames() : Object.keys(res._headers || {});
+    const headerNames = res.getHeaderNames
+      ? res.getHeaderNames()
+      : Object.keys(res._headers || {});
     headerNames.forEach(function (name) {
       res.removeHeader(name);
     });
@@ -151,4 +166,3 @@ export default function createServer(options) {
 
   return server;
 }
-
