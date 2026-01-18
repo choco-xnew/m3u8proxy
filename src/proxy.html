@@ -3,288 +3,289 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS // PROXY CONTROLLER</title>
+    <title>Stream Proxy // Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
     <style>
-        :root {
-            --primary: #00f0ff; /* Cyber Cyan */
-            --secondary: #7000ff; /* Neon Purple */
-            --alert: #ff003c; /* Cyber Red */
-            --bg-dark: #050505;
-            --panel-bg: rgba(10, 10, 12, 0.85);
-        }
-
         body {
-            font-family: 'JetBrains Mono', monospace;
-            background-color: var(--bg-dark);
-            color: #e0e0e0;
-            overflow: hidden;
-            background-image: 
-                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #020617; /* Slate 950 */
+            color: #f8fafc;
+            overflow-x: hidden;
         }
 
-        /* CRT Effect */
-        .scanlines {
-            position: fixed; top: 0; left: 0; w-full; h-full; pointer-events: none; z-index: 50;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 2px, 3px 100%;
+        /* Ambient Background Orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            opacity: 0.6;
+            animation: float 10s infinite ease-in-out;
+        }
+        .orb-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: #4f46e5; animation-delay: 0s; } /* Indigo */
+        .orb-2 { bottom: -10%; right: -10%; width: 40vw; height: 40vw; background: #c026d3; animation-delay: -2s; } /* Fuchsia */
+        .orb-3 { top: 40%; left: 40%; width: 30vw; height: 30vw; background: #0891b2; animation-delay: -4s; } /* Cyan */
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, -20px); }
         }
 
-        .panel {
-            background: var(--panel-bg);
-            border: 1px solid rgba(0, 240, 255, 0.2);
-            backdrop-filter: blur(10px);
-            position: relative;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        /* Glassmorphism Utilities */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
         }
 
-        .panel::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 10px; height: 10px;
-            border-top: 2px solid var(--primary); border-left: 2px solid var(--primary);
+        .glass-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
         }
-        .panel::after {
-            content: ''; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px;
-            border-bottom: 2px solid var(--primary); border-right: 2px solid var(--primary);
+        .glass-input:focus {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: #818cf8;
+            box-shadow: 0 0 15px rgba(129, 140, 248, 0.2);
+            outline: none;
         }
 
-        /* Terminal specific */
-        .terminal-body {
-            height: 300px;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: var(--primary) #111;
+        /* Animations */
+        .fade-in-up {
+            animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(20px);
         }
-        .cmd-input {
-            background: transparent; border: none; outline: none; color: var(--primary); width: 100%;
-        }
-        
-        .blink { animation: blinker 1s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0; } }
 
-        .glitch-text:hover {
-            text-shadow: 2px 0 var(--alert), -2px 0 var(--primary);
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
         }
-        
-        .stat-value {
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
-        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
     </style>
 </head>
-<body class="h-screen flex flex-col p-4 gap-4">
-    <div class="scanlines"></div>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
 
-    <!-- Header -->
-    <header class="flex justify-between items-end border-b border-gray-800 pb-2 shrink-0">
-        <div>
-            <h1 class="text-3xl font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 glitch-text">NEXUS_PROXY</h1>
-            <div class="text-xs text-gray-500">SYSTEM ID: <span id="sys-id">Loading...</span></div>
-        </div>
-        <div class="flex gap-6 text-sm">
-            <div class="flex flex-col items-end">
-                <span class="text-gray-500 text-[10px] uppercase">Server Time</span>
-                <span id="clock" class="text-cyan-400">00:00:00</span>
-            </div>
-            <div class="flex flex-col items-end">
-                <span class="text-gray-500 text-[10px] uppercase">Status</span>
-                <span class="text-green-500 font-bold flex items-center gap-2">
-                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> ONLINE
-                </span>
-            </div>
-        </div>
-    </header>
+    <!-- Ambient Background -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
 
-    <!-- Main Grid -->
-    <main class="flex-grow grid grid-cols-12 gap-4 min-h-0">
-        
-        <!-- Left Column: Stats -->
-        <div class="col-span-12 md:col-span-8 flex flex-col gap-4 min-h-0">
-            <!-- Top Stats Row -->
-            <div class="grid grid-cols-3 gap-4 h-32 shrink-0">
-                <div class="panel p-4 flex flex-col justify-between">
-                    <div class="text-gray-500 text-xs uppercase tracking-wider">Total Requests</div>
-                    <div class="text-4xl font-bold text-white stat-value" id="req-count">0</div>
-                    <div class="h-1 w-full bg-gray-800 mt-2"><div class="h-full bg-cyan-500 w-[45%]"></div></div>
+    <!-- Main Container -->
+    <main class="w-full max-w-6xl space-y-6">
+
+        <!-- Header Section -->
+        <header class="flex flex-col md:flex-row justify-between items-center glass-panel rounded-2xl p-6 fade-in-up" style="animation-delay: 0.1s;">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="ph ph-broadcast text-2xl text-white"></i>
                 </div>
-                <div class="panel p-4 flex flex-col justify-between">
-                    <div class="text-gray-500 text-xs uppercase tracking-wider">Uptime</div>
-                    <div class="text-2xl font-bold text-white" id="uptime">0h 0m</div>
-                    <div class="text-xs text-green-400 mt-1">Stable</div>
-                </div>
-                <div class="panel p-4 flex flex-col justify-between">
-                    <div class="text-gray-500 text-xs uppercase tracking-wider">Memory Load</div>
-                    <div class="text-4xl font-bold text-white stat-value" id="mem-load">0%</div>
-                    <div class="h-1 w-full bg-gray-800 mt-2"><div class="h-full bg-purple-500 w-[20%] animate-pulse"></div></div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">ProxyStream<span class="text-indigo-400">.io</span></h1>
+                    <p class="text-sm text-slate-400">Secure HLS Transmission</p>
                 </div>
             </div>
-
-            <!-- Graph Area -->
-            <div class="panel flex-grow p-4 relative min-h-0">
-                <div class="absolute top-2 right-2 text-[10px] text-cyan-500 border border-cyan-500 px-2 py-0.5">LIVE_TRAFFIC_MONITOR</div>
-                <canvas id="trafficChart" class="w-full h-full"></canvas>
-            </div>
-        </div>
-
-        <!-- Right Column: Terminal & Logs -->
-        <div class="col-span-12 md:col-span-4 flex flex-col gap-4 min-h-0">
-            <div class="panel flex-grow flex flex-col p-2 overflow-hidden">
-                <div class="bg-black/50 p-1 mb-2 border-b border-gray-800 flex justify-between items-center">
-                    <span class="text-xs text-gray-400 pl-2">TERMINAL_ACCESS</span>
-                    <div class="flex gap-1">
-                        <div class="w-2 h-2 rounded-full bg-red-500"></div>
-                        <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
-                        <div class="w-2 h-2 rounded-full bg-green-500"></div>
+            
+            <div class="flex items-center gap-6 mt-4 md:mt-0">
+                <div class="text-right">
+                    <p class="text-xs text-slate-400 uppercase font-semibold">Server Status</p>
+                    <div class="flex items-center justify-end gap-2 text-emerald-400 text-sm font-medium">
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Operational
                     </div>
                 </div>
-                
-                <!-- Terminal Output -->
-                <div class="terminal-body font-mono text-xs p-2 flex-grow" id="term-output">
-                    <div class="text-green-500">root@nexus:~$ initializing dashboard interface...</div>
-                    <div class="text-gray-400">loading modules... [OK]</div>
-                    <div class="text-gray-400">connecting to proxy core... [OK]</div>
-                    <div class="text-cyan-500 mt-2">Welcome, Operator. Type 'help' for commands.</div>
-                    <br>
-                </div>
+            </div>
+        </header>
 
-                <!-- Input Line -->
-                <div class="flex items-center gap-2 p-2 border-t border-gray-800 bg-black/30">
-                    <span class="text-cyan-500 font-bold">></span>
-                    <input type="text" id="term-input" class="cmd-input font-mono text-sm" placeholder="Enter command..." autocomplete="off" autofocus>
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 fade-in-up" style="animation-delay: 0.2s;">
+            <!-- Requests Card -->
+            <div class="glass-panel rounded-2xl p-6 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <i class="ph ph-arrows-left-right text-6xl"></i>
+                </div>
+                <p class="text-slate-400 text-sm font-medium">Total Requests</p>
+                <h2 class="text-3xl font-bold mt-2" id="stat-req">Loading...</h2>
+                <div class="mt-2 text-xs text-emerald-400 flex items-center gap-1">
+                    <i class="ph ph-trend-up"></i> Live Tracking
+                </div>
+            </div>
+
+            <!-- Uptime Card -->
+            <div class="glass-panel rounded-2xl p-6 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <i class="ph ph-timer text-6xl"></i>
+                </div>
+                <p class="text-slate-400 text-sm font-medium">System Uptime</p>
+                <h2 class="text-3xl font-bold mt-2" id="stat-uptime">Loading...</h2>
+                <div class="mt-2 text-xs text-blue-400 flex items-center gap-1">
+                    <i class="ph ph-check-circle"></i> Stable
+                </div>
+            </div>
+
+            <!-- Memory Card -->
+            <div class="glass-panel rounded-2xl p-6 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <i class="ph ph-cpu text-6xl"></i>
+                </div>
+                <p class="text-slate-400 text-sm font-medium">Memory Usage</p>
+                <h2 class="text-3xl font-bold mt-2" id="stat-mem">Loading...</h2>
+                <div class="w-full bg-slate-700/50 h-1 mt-3 rounded-full overflow-hidden">
+                    <div class="bg-purple-500 h-full w-1/3 animate-pulse"></div>
                 </div>
             </div>
         </div>
+
+        <!-- Player Section -->
+        <div class="glass-panel rounded-2xl p-1 fade-in-up" style="animation-delay: 0.3s;">
+            <div class="bg-slate-900/40 rounded-xl p-4 md:p-8">
+                
+                <!-- Input Area -->
+                <div class="flex flex-col md:flex-row gap-4 mb-8">
+                    <div class="relative flex-grow group">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <i class="ph ph-link text-slate-500 group-focus-within:text-indigo-400 transition-colors"></i>
+                        </div>
+                        <input type="text" id="url-input" 
+                            class="glass-input w-full pl-11 pr-4 py-3 rounded-xl text-sm placeholder-slate-500 text-white" 
+                            placeholder="Paste .m3u8 URL here..."
+                            autocomplete="off">
+                    </div>
+                    <button onclick="loadVideo()" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-3 px-8 rounded-xl shadow-lg shadow-indigo-500/25 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i class="ph ph-play-circle text-lg"></i>
+                        <span>Stream</span>
+                    </button>
+                    <button onclick="clearVideo()" class="glass-input hover:bg-red-500/10 hover:border-red-500/50 text-slate-300 hover:text-red-400 font-medium py-3 px-6 rounded-xl transition-all active:scale-95">
+                        <i class="ph ph-trash"></i>
+                    </button>
+                </div>
+
+                <!-- Video Container -->
+                <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden shadow-2xl border border-white/5 ring-1 ring-white/10 group">
+                    <video id="video" controls class="w-full h-full object-contain"></video>
+                    
+                    <!-- Placeholder State -->
+                    <div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm z-10 transition-opacity duration-500">
+                        <div class="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10 group-hover:scale-110 transition-transform duration-300">
+                            <i class="ph ph-film-strip text-4xl text-slate-500"></i>
+                        </div>
+                        <p class="text-slate-400 text-sm">Ready to stream</p>
+                    </div>
+                </div>
+
+                <!-- Current Link Display -->
+                <div id="active-link-container" class="mt-6 hidden">
+                    <p class="text-xs text-slate-500 uppercase font-bold mb-2">Proxy Link Generated</p>
+                    <div class="glass-input rounded-lg p-3 flex justify-between items-center">
+                        <code class="text-xs text-indigo-300 font-mono truncate mr-4" id="active-link">...</code>
+                        <button onclick="copyLink()" class="text-slate-400 hover:text-white transition-colors p-1">
+                            <i class="ph ph-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
     </main>
 
+    <footer class="mt-12 text-slate-500 text-sm font-medium fade-in-up" style="animation-delay: 0.4s;">
+        <p>&copy; 2026 ProxyStream. All Systems Operational.</p>
+    </footer>
+
     <script>
-        // --- 1. Terminal Logic ---
-        const termOutput = document.getElementById('term-output');
-        const termInput = document.getElementById('term-input');
-        
-        const commands = {
-            'help': 'Available commands: status, clear, reboot, version, ping',
-            'status': 'Fetching system diagnostics...',
-            'clear': 'CLS',
-            'version': 'Nexus Proxy v2.4.0 (Build 2026)',
-            'ping': 'Pinging internal localhost...'
-        };
+        const video = document.getElementById('video');
+        const urlInput = document.getElementById('url-input');
+        const placeholder = document.getElementById('video-placeholder');
+        const linkContainer = document.getElementById('active-link-container');
+        const linkText = document.getElementById('active-link');
+        let hls;
 
-        function log(text, color = 'text-gray-300') {
-            const div = document.createElement('div');
-            div.className = `mb-1 ${color}`;
-            div.innerHTML = text;
-            termOutput.appendChild(div);
-            termOutput.scrollTop = termOutput.scrollHeight;
-        }
+        // Auto-load on Enter
+        urlInput.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') loadVideo();
+        });
 
-        async function execute(cmd) {
-            log(`<span class="text-cyan-600">root@nexus:~$</span> ${cmd}`);
+        function loadVideo() {
+            const url = urlInput.value.trim();
+            if (!url) return;
+
+            // Construct Proxy URL (Assuming server handles ?url= parameter)
+            // We use the current origin to ensure it works wherever deployed
+            const proxyUrl = `${window.location.origin}/?url=${encodeURIComponent(url)}`;
             
-            const lowerCmd = cmd.toLowerCase().trim();
+            // UI Updates
+            placeholder.classList.add('opacity-0', 'pointer-events-none');
+            linkContainer.classList.remove('hidden');
+            linkText.innerText = proxyUrl;
 
-            if (lowerCmd === 'clear') {
-                termOutput.innerHTML = '';
-                return;
-            }
-
-            if (lowerCmd === 'status') {
-                log('Querying server API...', 'text-yellow-500');
-                try {
-                    const res = await fetch('/api/stats');
-                    const data = await res.json();
-                    log(`[SUCCESS] Data received`, 'text-green-500');
-                    log(`-----------------------------`);
-                    log(`REQ_TOTAL : ${data.requests}`);
-                    log(`UPTIME    : ${data.uptime}`);
-                    log(`MEMORY    : ${data.memory}`);
-                    log(`-----------------------------`);
-                } catch (e) {
-                    log(`[ERROR] Connection refused`, 'text-red-500');
-                }
-                return;
-            }
-
-            if (commands[lowerCmd]) {
-                log(commands[lowerCmd]);
-            } else {
-                log(`Command not found: ${cmd}`, 'text-red-400');
+            // HLS Logic
+            if (Hls.isSupported()) {
+                if (hls) hls.destroy();
+                hls = new Hls();
+                hls.loadSource(proxyUrl);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+                
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                     if (data.fatal) {
+                        console.error('HLS Fatal Error', data);
+                        // Optional: Show error toast
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = proxyUrl;
+                video.addEventListener('loadedmetadata', () => video.play());
             }
         }
 
-        termInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const cmd = termInput.value;
-                if(cmd) execute(cmd);
-                termInput.value = '';
-            }
-        });
+        function clearVideo() {
+            if (hls) hls.destroy();
+            video.pause();
+            video.src = '';
+            urlInput.value = '';
+            placeholder.classList.remove('opacity-0', 'pointer-events-none');
+            linkContainer.classList.add('hidden');
+        }
 
+        function copyLink() {
+            navigator.clipboard.writeText(linkText.innerText);
+            // Visual feedback could be added here
+        }
 
-        // --- 2. Live Data & Chart Logic ---
-        const ctx = document.getElementById('trafficChart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: Array(20).fill(''),
-                datasets: [{
-                    label: 'Requests/sec',
-                    data: Array(20).fill(0),
-                    borderColor: '#00f0ff',
-                    backgroundColor: 'rgba(0, 240, 255, 0.1)',
-                    borderWidth: 1,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { display: false },
-                    y: { grid: { color: '#333' }, ticks: { color: '#666' } }
-                },
-                animation: { duration: 0 }
-            }
-        });
-
-        // Clock
-        setInterval(() => {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleTimeString();
-        }, 1000);
-
-        // Fetch Loop
-        setInterval(async () => {
+        // Live Stats Fetcher
+        async function updateStats() {
             try {
                 const res = await fetch('/api/stats');
+                if (!res.ok) throw new Error('API Fail');
                 const data = await res.json();
                 
-                // Update DOM
-                document.getElementById('req-count').innerText = data.requests;
-                document.getElementById('uptime').innerText = data.uptime;
-                document.getElementById('sys-id').innerText = data.host;
-                
-                // Mock Memory Load (Visual only since API gives bytes)
-                document.getElementById('mem-load').innerText = Math.floor(Math.random() * 20 + 30) + '%';
-
-                // Update Chart
-                const newReqs = Math.floor(Math.random() * 10); // Simulated delta for visual
-                const currentData = chart.data.datasets[0].data;
-                currentData.shift();
-                currentData.push(newReqs);
-                chart.update();
-
-            } catch(e) {
-                // Silent fail for UI polish
+                document.getElementById('stat-req').innerText = data.requests.toLocaleString();
+                document.getElementById('stat-uptime').innerText = data.uptime;
+                document.getElementById('stat-mem').innerText = data.memory;
+            } catch (e) {
+                console.log('Stats sync paused');
             }
-        }, 2000);
-        
-        // Init
-        document.getElementById('sys-id').innerText = 'INITIALIZING...';
+        }
+
+        // Initial fetch and interval
+        updateStats();
+        setInterval(updateStats, 5000);
+
     </script>
 </body>
 </html>
+
+
