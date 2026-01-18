@@ -1,7 +1,5 @@
 import { isValidHostName } from "./isValidHostName.js";
 import { getProxyForUrl } from "proxy-from-env";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import withCORS from "./withCORS.js";
@@ -63,25 +61,9 @@ export default function getHandler(options, proxy) {
 
     const cors_headers = withCORS({}, req);
 
-    // OPTIONS preflight
     if (req.method === "OPTIONS") {
       res.writeHead(200, cors_headers);
       res.end();
-      return;
-    }
-
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-
-    /* =====================================================
-       🔓 FREE ACCESS ZONE (NO CORS / NO ORIGIN CHECK)
-       ===================================================== */
-    if (req.url === "/" || req.url === "/index.html") {
-      res.writeHead(200, {
-        "Content-Type": "text/html",
-        "Access-Control-Allow-Origin": "*",
-      });
-      res.end(readFileSync(join(__dirname, "../index.html")));
       return;
     }
 
@@ -103,7 +85,8 @@ export default function getHandler(options, proxy) {
         return;
       }
 
-      res.end(readFileSync(join(__dirname, "../index.html")));
+      res.writeHead(404, "Not Found", cors_headers);
+      res.end("Not Found");
       return;
     }
 
@@ -156,10 +139,6 @@ export default function getHandler(options, proxy) {
       return;
     }
 
-    /* =====================
-       🔒 CORS SECURITY ZONE
-       ===================== */
-
     if (!hasRequiredHeaders(req.headers)) {
       res.writeHead(400, "Header required", cors_headers);
       res.end(
@@ -191,6 +170,20 @@ export default function getHandler(options, proxy) {
     if (rateLimitMessage) {
       res.writeHead(429, "Too Many Requests", cors_headers);
       res.end(rateLimitMessage);
+      return;
+    }
+
+    if (
+      corsAnywhere.redirectSameOrigin &&
+      origin &&
+      location.href[origin.length] === "/" &&
+      location.href.lastIndexOf(origin, 0) === 0
+    ) {
+      cors_headers.vary = "origin";
+      cors_headers["cache-control"] = "private";
+      cors_headers.location = location.href;
+      res.writeHead(301, "Please use a direct request", cors_headers);
+      res.end();
       return;
     }
 
